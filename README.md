@@ -65,6 +65,6 @@ High water + Low sunlight → Root rot risk
 Consistent optimal conditions → Accelerated growth
 
 ☁️ Deployment:
-Frontend: Vercel
-Backend: Render
+Frontend: Vercel,
+Backend: Render,
 Database: MongoDB Atlas
