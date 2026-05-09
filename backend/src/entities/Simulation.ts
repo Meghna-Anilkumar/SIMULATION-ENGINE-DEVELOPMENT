@@ -1,9 +1,9 @@
+export type Level = 'Low' | 'Medium' | 'High';
 export type HealthStatus = 'Excellent' | 'Good' | 'Stressed' | 'Wilting' | 'RootRot' | 'Diseased';
 
 export interface EnvironmentalInputs {
-  sunlight: 'Low' | 'Medium' | 'High';
-  water: 'Low' | 'Medium' | 'High';
-  humidity?: 'Low' | 'Medium' | 'High';
+  sunlight: Level;
+  water: Level;
 }
 
 export interface PlantState {
@@ -11,6 +11,7 @@ export interface PlantState {
   growthLevel: number;
   healthStatus: HealthStatus;
   stressLevel: number;
+  consecutiveOptimalDays: number;
   message: string;
   timestamp: Date;
 }
