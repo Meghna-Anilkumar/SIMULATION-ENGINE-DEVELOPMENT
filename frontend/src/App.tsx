@@ -1,279 +1,159 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Line } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
-import { Leaf, Droplet, Sun, RotateCcw, Play } from 'lucide-react';
+import { Leaf, RotateCcw, Activity } from 'lucide-react';
+import { simulationApi } from './services/api';
+import type { PlantState, EnvironmentalInputs, HealthStatus } from './types/simulation';
+import SimulationControls from './components/SimulationControls';
+import PlantStatusCard from './components/PlantStatusCard';
+import GrowthChart from './components/GrowthChart';
+import HistoryLog from './components/HistoryLog';
+import ResetConfirmModal from './components/ResetConfirmModal';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
-
-const API_BASE = import.meta.env.VITE_API_URL as string;
-
-type PlantState = {
-  day: number;
-  growthLevel: number;
-  healthStatus: string;
-  stressLevel: number;
-  message: string;
+const DEFAULT_STATE: PlantState = {
+  day: 0,
+  growthLevel: 0,
+  healthStatus: 'Good' as HealthStatus,
+  stressLevel: 0,
+  message: '',
 };
 
-const statusColors: Record<string, string> = {
-  Excellent: 'bg-green-500',
-  Good: 'bg-emerald-500',
-  Stressed: 'bg-yellow-500',
-  Wilting: 'bg-orange-500',
-  RootRot: 'bg-red-500',
-  Diseased: 'bg-rose-600',
-};
-
-function App() {
-  const [sunlight, setSunlight] = useState<'Low' | 'Medium' | 'High'>('Medium');
-  const [water, setWater] = useState<'Low' | 'Medium' | 'High'>('Medium');
+export default function App() {
+  const [inputs, setInputs] = useState<EnvironmentalInputs>({
+    sunlight: 'Medium',
+    water: 'Medium',
+  });
   const [history, setHistory] = useState<PlantState[]>([]);
-  const [isRunning, setIsRunning] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [runningMode, setRunningMode] = useState<'step' | 'multi' | null>(null);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   const fetchHistory = async () => {
-    const res = await axios.get(`${API_BASE}/history`);
-    setHistory(res.data.data || []);
+    try {
+      const res = await simulationApi.getHistory();
+      setHistory(res.data.data ?? []);
+    } catch {
+      console.error('Failed to fetch history');
+    }
   };
 
-
   useEffect(() => {
-    void (async () => {
-      await fetchHistory();
-    })();
+    void (async () => { await fetchHistory(); })();
   }, []);
 
   const runStep = async () => {
-    setIsRunning(true);
-    await axios.post(`${API_BASE}/step`, { sunlight, water });
-    await fetchHistory();
-    setIsRunning(false);
+    setIsLoading(true);
+    setRunningMode('step');
+    try {
+      await simulationApi.runStep(inputs);
+      await fetchHistory();
+    } catch {
+      alert('Error running simulation step');
+    } finally {
+      setIsLoading(false);
+      setRunningMode(null);
+    }
   };
 
   const runMultiple = async (days: number) => {
-    setIsRunning(true);
-    for (let i = 0; i < days; i++) {
-      await axios.post(`${API_BASE}/step`, { sunlight, water });
+    setIsLoading(true);
+    setRunningMode('multi');
+    try {
+      for (let i = 0; i < days; i++) {
+        await simulationApi.runStep(inputs);
+      }
+      await fetchHistory();
+    } catch {
+      alert('Error running multiple days');
+    } finally {
+      setIsLoading(false);
+      setRunningMode(null);
     }
-    await fetchHistory();
-    setIsRunning(false);
   };
 
-  const resetSimulation = async () => {
-    await axios.post(`${API_BASE}/reset`);
-    setHistory([]);
+  const handleResetConfirm = async () => {
+    setIsResetting(true);
+    try {
+      await simulationApi.reset();
+      setHistory([]);
+      setShowResetModal(false);
+    } catch {
+      alert('Reset failed');
+    } finally {
+      setIsResetting(false);
+    }
   };
 
-
-  const currentState: PlantState = history[history.length - 1] ?? {
-    growthLevel: 30,
-    healthStatus: 'Good',
-    stressLevel: 20,
-    day: 0,
-    message: '',
-  };
-
-  const chartData = {
-    labels: history.map((h) => `Day ${h.day}`),
-    datasets: [
-      {
-        label: 'Growth Level',
-        data: history.map((h) => h.growthLevel),
-        borderColor: '#4ade80',
-        backgroundColor: 'rgba(74, 222, 128, 0.1)',
-        tension: 0.4,
-      },
-      {
-        label: 'Stress Level',
-        data: history.map((h) => h.stressLevel),
-        borderColor: '#f87171',
-        backgroundColor: 'rgba(248, 113, 113, 0.1)',
-        tension: 0.4,
-      },
-    ],
-  };
+  const current: PlantState = history[history.length - 1] ?? DEFAULT_STATE;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-green-950 to-emerald-950 text-white">
-      <header className="border-b border-white/10 bg-black/30 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+    <div className="min-h-screen bg-[#080f1a] text-white font-sans">
+      {/* Background glow */}
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(16,185,129,0.06)_0%,transparent_60%),radial-gradient(ellipse_at_bottom_right,rgba(59,130,246,0.05)_0%,transparent_60%)] pointer-events-none" />
+
+      {/* Reset modal */}
+      {showResetModal && (
+        <ResetConfirmModal
+          onConfirm={handleResetConfirm}
+          onCancel={() => setShowResetModal(false)}
+          isResetting={isResetting}
+        />
+      )}
+
+      {/* Header */}
+      <header className="relative border-b border-white/[0.07] bg-[#080f1a]/80 backdrop-blur-xl sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center">
-              <Leaf className="w-6 h-6 text-white" />
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+              <Leaf size={18} className="text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">FieldSense</h1>
-              <p className="text-xs text-green-400 -mt-1">Simulation Engine</p>
+              <h1 className="text-lg font-bold tracking-tight">FieldSense</h1>
+              <p className="text-[11px] text-emerald-400/80 -mt-0.5 tracking-wider uppercase">
+                Simulation Engine
+              </p>
             </div>
           </div>
-          <button
-            onClick={resetSimulation}
-            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Reset
-          </button>
+
+          <div className="flex items-center gap-3">
+            {history.length > 0 && (
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-gray-400">
+                <Activity size={12} className="text-emerald-400" />
+                <span>{history.length} days simulated</span>
+              </div>
+            )}
+            <button
+              onClick={() => setShowResetModal(true)}
+              disabled={isResetting}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-rose-500/10 border border-white/10 hover:border-rose-500/30 text-gray-400 hover:text-rose-400 transition-all duration-200 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white/5 disabled:hover:border-white/10 disabled:hover:text-gray-400"
+            >
+              <RotateCcw size={14} className={isResetting ? 'animate-spin' : ''} />
+              <span className="hidden sm:inline">Reset</span>
+            </button>
+          </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-4 space-y-6">
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8">
-            <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
-              <Sun className="text-amber-400" /> Environmental Conditions
-            </h2>
-
-            <div className="mb-8">
-              <label className="text-sm text-green-400 mb-3 block">SUNLIGHT</label>
-              <div className="grid grid-cols-3 gap-3">
-                {(['Low', 'Medium', 'High'] as const).map((level) => (
-                  <button
-                    key={level}
-                    onClick={() => setSunlight(level)}
-                    className={`py-4 rounded-2xl font-medium transition-all ${
-                      sunlight === level
-                        ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/50'
-                        : 'bg-white/5 hover:bg-white/10'
-                    }`}
-                  >
-                    {level}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm text-green-400 mb-3 block">WATER</label>
-              <div className="grid grid-cols-3 gap-3">
-                {(['Low', 'Medium', 'High'] as const).map((level) => (
-                  <button
-                    key={level}
-                    onClick={() => setWater(level)}
-                    className={`py-4 rounded-2xl font-medium transition-all flex items-center justify-center gap-2 ${
-                      water === level
-                        ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/50'
-                        : 'bg-white/5 hover:bg-white/10'
-                    }`}
-                  >
-                    <Droplet className="w-5 h-5" />
-                    {level}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-10 space-y-3">
-              <button
-                onClick={runStep}
-                disabled={isRunning}
-                className="w-full py-4 bg-green-600 hover:bg-green-500 rounded-2xl font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-70"
-              >
-                <Play className="w-5 h-5" />
-                RUN ONE DAY
-              </button>
-
-              <button
-                onClick={() => runMultiple(10)}
-                disabled={isRunning}
-                className="w-full py-4 bg-white/10 hover:bg-white/20 rounded-2xl font-semibold transition-all"
-              >
-                SIMULATE 10 DAYS
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8">
-            <h3 className="text-lg font-medium mb-4">Current Status</h3>
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <p className="text-sm text-gray-400">Day</p>
-                <p className="text-4xl font-bold">{currentState.day}</p>
-              </div>
-              <div className={`px-5 py-2 rounded-full text-sm font-medium text-white ${statusColors[currentState.healthStatus] ?? 'bg-gray-500'}`}>
-                {currentState.healthStatus}
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div>
-                <div className="flex justify-between text-sm mb-1.5">
-                  <span>Growth</span>
-                  <span className="font-medium">{currentState.growthLevel}%</span>
-                </div>
-                <div className="h-3 bg-white/10 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-green-500 rounded-full transition-all"
-                    style={{ width: `${currentState.growthLevel}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-sm mb-1.5">
-                  <span>Stress</span>
-                  <span className="font-medium text-red-400">{currentState.stressLevel}%</span>
-                </div>
-                <div className="h-3 bg-white/10 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-red-500 rounded-full transition-all"
-                    style={{ width: `${currentState.stressLevel}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+      {/* Main layout */}
+      <main className="relative max-w-7xl mx-auto px-4 sm:px-6 py-6 grid grid-cols-1 xl:grid-cols-12 gap-5">
+        <div className="xl:col-span-4 flex flex-col gap-5">
+          <SimulationControls
+            inputs={inputs}
+            setInputs={setInputs}
+            onRunStep={runStep}
+            onRunMultiple={runMultiple}
+            onReset={() => setShowResetModal(true)}
+            isLoading={isLoading}
+            runningMode={runningMode}
+            isResetting={isResetting}
+          />
+          <PlantStatusCard current={current} />
         </div>
 
-        <div className="lg:col-span-8">
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 h-full">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-semibold">Plant Growth Progression</h2>
-              <p className="text-green-400 text-sm">Real-time Simulation</p>
-            </div>
-
-            {history.length > 0 ? (
-              <div className="h-[520px]">
-                <Line
-                  data={chartData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'top' } },
-                    scales: {
-                      y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.1)' } },
-                      x: { grid: { color: 'rgba(255,255,255,0.1)' } },
-                    },
-                  }}
-                />
-              </div>
-            ) : (
-              <div className="h-[520px] flex items-center justify-center text-center">
-                <div>
-                  <Leaf className="w-20 h-20 mx-auto text-green-600/30 mb-4" />
-                  <p className="text-xl text-gray-400">Start simulation to see growth curve</p>
-                </div>
-              </div>
-            )}
-
-            {currentState.message && (
-              <div className="mt-6 p-4 bg-white/10 rounded-2xl text-sm border-l-4 border-green-500">
-                💡 {currentState.message}
-              </div>
-            )}
-          </div>
+        <div className="xl:col-span-8 flex flex-col gap-5">
+          <GrowthChart history={history} />
+          <HistoryLog history={history} />
         </div>
-      </div>
+      </main>
     </div>
   );
 }
-
-export default App;
