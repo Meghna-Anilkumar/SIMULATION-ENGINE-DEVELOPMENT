@@ -54,66 +54,6 @@ SIMULATION ENGINE DEVELOPMENT/
 ├── frontend/
 ├── backend/
 
-┌───────────────────────────────────────────────┐
-│                  FRONTEND                     │
-│        React + TypeScript + Vite              │
-│───────────────────────────────────────────────│
-│                                               │
-│  Components                                   │
-│  ├── Simulation Controls                      │
-│  ├── Growth Charts                            │
-│  ├── History Timeline                         │
-│  └── Plant Status Card                        │
-│                                               │
-│  Services                                     │
-│  └── Axios API Layer                          │
-│                                               │
-└───────────────────────────────────────────────┘
-                        │
-                        │ HTTP Requests
-                        ▼
-┌───────────────────────────────────────────────┐
-│                  BACKEND                      │
-│        Node.js + Express + TypeScript         │
-│───────────────────────────────────────────────│
-│                                               │
-│  Routes                                       │
-│  └── Simulation Routes                        │
-│                                               │
-│  Controllers                                  │
-│  └── Handle API Requests                      │
-│                                               │
-│  Services                                     │
-│  └── Simulation Service                       │
-│                                               │
-│  Rule Engine                                  │
-│  └── PlantGrowthRules                         │
-│                                               │
-│  Repositories                                 │
-│  └── Database Operations                      │
-│                                               │
-│  DTOs & Validation                            │
-│  └── Input Validation                         │
-│                                               │
-└───────────────────────────────────────────────┘
-                        │
-                        │ Mongoose
-                        ▼
-┌───────────────────────────────────────────────┐
-│                 DATABASE                      │
-│                 MongoDB Atlas                 │
-│───────────────────────────────────────────────│
-│                                               │
-│  Simulation Collection                        │
-│  ├── day                                      │
-│  ├── growthLevel                              │
-│  ├── stressLevel                              │
-│  ├── healthStatus                             │
-│  ├── consecutiveOptimalDays                   │
-│  ├── message                                  │
-│  └── timestamp                                │
-│                                               │
-└───────────────────────────────────────────────┘
 
 ⚙️ Installation
 Clone Repository:
